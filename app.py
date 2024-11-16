@@ -12,9 +12,14 @@ from docx import Document as DocxDocument
 
 
 # Initialize Together AI model
+# Access secrets from Streamlit Secrets Manager
+api_key = st.secrets["together_ai"]["api_key"]
+model = st.secrets["together_ai"]["model"]
+
+# Initialize Together AI model with secrets
 chat_model = ChatTogether(
-   together_api_key="c51c9bcaa6bf7fae3ce684206311564828c13fa2e91553f915fee01d517ccee9",
-    model="meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo"
+    together_api_key=api_key,
+    model=model
 )
 
 # Prompt engineering
