@@ -10,9 +10,7 @@ import PyPDF2
 import io
 from docx import Document as DocxDocument
 
-
 # Initialize Together AI model
-# Access secrets from Streamlit Secrets Manager
 api_key = st.secrets["together_ai"]["api_key"]
 model = st.secrets["together_ai"]["model"]
 
@@ -37,7 +35,6 @@ prompt_template = PromptTemplate(
 qa_chain = LLMChain(llm=chat_model, prompt=prompt_template)
 
 st.title("📝 File Q&A")
-uploaded_files = st.file_uploader("Upload articles", type=("txt", "pdf", "docx"), accept_multiple_files=True)
 
 # Initialize session state
 if "messages" not in st.session_state:
@@ -47,31 +44,54 @@ if "processed_files" not in st.session_state:
 if "file_contents" not in st.session_state:
     st.session_state["file_contents"] = {}
 
-# Disable the chat input until at least one file is uploaded
-chat_disabled = len(uploaded_files) == 0
+# Load a default document
+default_file_path = "FD.docx"  # Replace with the path to your default file
+try:
+    with open(default_file_path, "rb") as f:
+        file_content = None
+        file_name = default_file_path.split("/")[-1]
+        
+        if default_file_path.endswith(".txt"):
+            file_content = f.read().decode("utf-8")
+        elif default_file_path.endswith(".pdf"):
+            pdf_reader = PyPDF2.PdfReader(f)
+            file_content = "".join(page.extract_text() for page in pdf_reader.pages)
+        elif default_file_path.endswith(".docx"):
+            doc = DocxDocument(f)
+            file_content = "\n".join(para.text for para in doc.paragraphs)
 
-# File processing
+        if file_content:
+            document = Document(page_content=file_content, metadata={"source": file_name})
+            chunk_size = 1000
+            chunk_overlap = 200
+
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            chunks = text_splitter.split_documents([document])
+
+            st.session_state["file_contents"][file_name] = "\n\n".join(chunk.page_content for chunk in chunks)
+            st.success(f"Automatically loaded {file_name}")
+except Exception as e:
+    st.error(f"Error loading default file: {str(e)}")
+
+# File uploader
+uploaded_files = st.file_uploader("Upload articles", type=("txt", "pdf", "docx"), accept_multiple_files=True)
+
+# File processing for uploaded files
 for uploaded_file in uploaded_files:
     if uploaded_file.name not in st.session_state["file_contents"]:
         try:
-            # Handle different file types
             if uploaded_file.type == "text/plain":
                 file_content = uploaded_file.getvalue().decode("utf-8")
             elif uploaded_file.type == "application/pdf":
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(uploaded_file.getvalue()))
-                file_content = ""
-                for page in pdf_reader.pages:
-                    file_content += page.extract_text()
+                file_content = "".join(page.extract_text() for page in pdf_reader.pages)
             elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                 doc = DocxDocument(io.BytesIO(uploaded_file.getvalue()))
-                file_content = ""
-                for para in doc.paragraphs:
-                    file_content += para.text + "\n"
+                file_content = "\n".join(para.text for para in doc.paragraphs)
             else:
                 st.error(f"Unsupported file type for {uploaded_file.name}. Please upload .txt, .pdf, or .docx files.")
                 continue
 
-            # Split the content into chunks
             document = Document(page_content=file_content, metadata={"source": uploaded_file.name})
             chunk_size = 1000
             chunk_overlap = 200
@@ -79,7 +99,7 @@ for uploaded_file in uploaded_files:
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
             chunks = text_splitter.split_documents([document])
 
-            st.session_state["file_contents"][uploaded_file.name] = "\n\n".join([chunk.page_content for chunk in chunks])
+            st.session_state["file_contents"][uploaded_file.name] = "\n\n".join(chunk.page_content for chunk in chunks)
             st.success(f"Processed {uploaded_file.name}")
         except Exception as e:
             st.error(f"Error processing {uploaded_file.name}: {str(e)}")
@@ -88,14 +108,18 @@ for uploaded_file in uploaded_files:
 with st.expander("Chat History"):
     for msg in st.session_state.messages:
         if msg["role"] == "assistant":
-            # Assistant's message on the left
-            st.markdown(f"<div style='text-align: left; background-color: #f4f4f9; padding: 10px; border-radius: 10px; width: 80%; margin: 5px;'>Assistant: {msg['content']}</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='text-align: left; background-color: #f4f4f9; padding: 10px; border-radius: 10px; width: 80%; margin: 5px;'>Assistant: {msg['content']}</div>",
+                unsafe_allow_html=True,
+            )
         else:
-            # User's message on the right
-            st.markdown(f"<div style='text-align: right; background-color: #d1e7fd; padding: 10px; border-radius: 10px; width: 80%; margin: 5px;'>User: {msg['content']}</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='text-align: right; background-color: #d1e7fd; padding: 10px; border-radius: 10px; width: 80%; margin: 5px;'>User: {msg['content']}</div>",
+                unsafe_allow_html=True,
+            )
 
-# Chat functionality (send button for user input)
-question = st.text_input("Ask a question about the uploaded documents:", disabled=chat_disabled)
+# Chat functionality
+question = st.text_input("Ask a question about the uploaded documents:", disabled=len(st.session_state["file_contents"]) == 0)
 
 if st.button("Send"):
     if question:
@@ -104,18 +128,13 @@ if st.button("Send"):
 
         with st.chat_message("assistant"):
             try:
-                # Combine contents from all uploaded files
                 all_contents = "\n\n".join(
                     [f"Content of {filename}:\n{content}" for filename, content in st.session_state["file_contents"].items()]
                 )
 
-                # Use the QA chain to get an answer
                 answer = qa_chain.run(context=all_contents, question=question)
-
-                # Display the assistant's response
                 st.write(answer)
 
-                # Save the assistant's response in session state
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             except Exception as e:
                 st.error(f"Error querying Together AI model: {str(e)}")
