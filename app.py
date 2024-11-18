@@ -10,11 +10,10 @@ import PyPDF2
 import io
 from docx import Document as DocxDocument
 
-# Initialize Together AI model
+
 api_key = st.secrets["together_ai"]["api_key"]
 model = st.secrets["together_ai"]["model"]
 
-# Initialize Together AI model with secrets
 chat_model = ChatTogether(
     together_api_key=api_key,
     model=model
@@ -44,8 +43,8 @@ if "processed_files" not in st.session_state:
 if "file_contents" not in st.session_state:
     st.session_state["file_contents"] = {}
 
-# Load a default document
-default_file_path = "FD.docx"  # Replace with the path to your default file
+
+default_file_path = "FD.docx"  
 try:
     with open(default_file_path, "rb") as f:
         file_content = None
@@ -73,10 +72,8 @@ try:
 except Exception as e:
     st.error(f"Error loading default file: {str(e)}")
 
-# File uploader
 uploaded_files = st.file_uploader("Upload articles", type=("txt", "pdf", "docx"), accept_multiple_files=True)
 
-# File processing for uploaded files
 for uploaded_file in uploaded_files:
     if uploaded_file.name not in st.session_state["file_contents"]:
         try:
