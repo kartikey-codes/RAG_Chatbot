@@ -44,33 +44,33 @@ if "file_contents" not in st.session_state:
     st.session_state["file_contents"] = {}
 
 
-default_file_path = "FD.docx"  
-try:
-    with open(default_file_path, "rb") as f:
-        file_content = None
-        file_name = default_file_path.split("/")[-1]
+# default_file_path = "FD.docx"  
+# try:
+    # with open(default_file_path, "rb") as f:
+    #     file_content = None
+    #     file_name = default_file_path.split("/")[-1]
         
-        if default_file_path.endswith(".txt"):
-            file_content = f.read().decode("utf-8")
-        elif default_file_path.endswith(".pdf"):
-            pdf_reader = PyPDF2.PdfReader(f)
-            file_content = "".join(page.extract_text() for page in pdf_reader.pages)
-        elif default_file_path.endswith(".docx"):
-            doc = DocxDocument(f)
-            file_content = "\n".join(para.text for para in doc.paragraphs)
+        # if default_file_path.endswith(".txt"):
+        #     file_content = f.read().decode("utf-8")
+        # elif default_file_path.endswith(".pdf"):
+        #     pdf_reader = PyPDF2.PdfReader(f)
+        #     file_content = "".join(page.extract_text() for page in pdf_reader.pages)
+        # elif default_file_path.endswith(".docx"):
+        #     doc = DocxDocument(f)
+        #     file_content = "\n".join(para.text for para in doc.paragraphs)
 
-        if file_content:
-            document = Document(page_content=file_content, metadata={"source": file_name})
-            chunk_size = 1000
-            chunk_overlap = 200
+#         if file_content:
+#             document = Document(page_content=file_content, metadata={"source": file_name})
+#             chunk_size = 1000
+#             chunk_overlap = 200
 
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-            chunks = text_splitter.split_documents([document])
+#             text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+#             chunks = text_splitter.split_documents([document])
 
-            st.session_state["file_contents"][file_name] = "\n\n".join(chunk.page_content for chunk in chunks)
-            st.success(f"Automatically loaded {file_name}")
-except Exception as e:
-    st.error(f"Error loading default file: {str(e)}")
+#             st.session_state["file_contents"][file_name] = "\n\n".join(chunk.page_content for chunk in chunks)
+#             st.success(f"Automatically loaded {file_name}")
+# except Exception as e:
+#     st.error(f"Error loading default file: {str(e)}")
 
 uploaded_files = st.file_uploader("Upload articles", type=("txt", "pdf", "docx"), accept_multiple_files=True)
 
